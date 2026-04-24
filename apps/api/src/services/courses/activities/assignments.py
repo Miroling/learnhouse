@@ -57,72 +57,6 @@ from src.services.webhooks.dispatch import dispatch_webhooks
 logger = logging.getLogger(__name__)
 
 
-def _block_api_tokens(current_user: PublicUser | AnonymousUser | APITokenUser) -> None:
-    """
-    Block API tokens from accessing assignments.
-
-    SECURITY: Assignments contain sensitive user submission data and grades.
-    API tokens are not allowed to access this data - only user authentication is permitted.
-    """
-    if isinstance(current_user, APITokenUser):
-        raise HTTPException(
-            status_code=403,
-            detail="API tokens cannot access assignments. Only user authentication is allowed.",
-        )
-
-
-## > Grade computation
-
-# Default passing threshold as a percentage (0-100). Used for PASS_FAIL,
-# NUMERIC, and PERCENTAGE grading types — any type where the pass/fail line
-# isn't implied by the display format itself.
-DEFAULT_PASSING_THRESHOLD_PERCENTAGE = 50.0
-
-# For ALPHABET (A/B/C/D/F) and GPA_SCALE (0.0-4.0), we use 60% as the passing
-# line so the `passed` field stays consistent with the display: any score that
-# renders as "F" or "0.0" will also have passed=False.
-LETTER_PASSING_THRESHOLD_PERCENTAGE = 60.0
-
-
-## > Auto-grading allow-list + server-side verification
-##
-## IMPORTANT: Not every task type can be graded without a human reviewer.
-## This is an EXPLICIT allow-list (not a deny-list) so that when new task
-## types are added to AssignmentTaskTypeEnum in the future, they default
-## to requiring human review until they're explicitly opted in here.
-
-# Tasks whose grade can be computed without teacher review. FILE_SUBMISSION
-# and OTHER are deliberately excluded — files need human eyes, and OTHER is
-# a legacy catch-all with no grading logic.
-AUTO_GRADABLE_TASK_TYPES = frozenset(
-    {
-        AssignmentTaskTypeEnum.QUIZ,
-        AssignmentTaskTypeEnum.FORM,
-        AssignmentTaskTypeEnum.CODE,
-        AssignmentTaskTypeEnum.SHORT_ANSWER,
-        AssignmentTaskTypeEnum.NUMBER_ANSWER,
-    }
-)
-
-# Tasks where the backend independently verifies the student's answer
-# against the stored task contents during auto-grading, instead of trusting
-# whatever grade the client-side component computed and posted.
-#
-# CODE is included: on auto-grade, the backend spins up a fresh Judge0
-# batch against the student's stored source_code using the teacher's
-# configured test_cases + grading_mode. The client-stored grade is
-# ignored (students save with grade=0 today), so without server-side
-# re-grading CODE tasks silently award zero.
-SERVER_VERIFIED_TASK_TYPES = frozenset(
-    {
-        AssignmentTaskTypeEnum.SHORT_ANSWER,
-        AssignmentTaskTypeEnum.NUMBER_ANSWER,
-        AssignmentTaskTypeEnum.QUIZ,
-        AssignmentTaskTypeEnum.FORM,
-        AssignmentTaskTypeEnum.CODE,
-    }
-)
-
 
 def _check_short_answer(answer, accepted, mode) -> bool:
     """
@@ -621,7 +555,6 @@ async def create_assignment(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if org exists
     statement = select(Course).where(Course.id == assignment_object.course_id)
     course = db_session.exec(statement).first()
@@ -664,7 +597,6 @@ async def read_assignment(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     statement = (
         select(Assignment, Course.course_uuid, Activity.activity_uuid)
         .join(Course, Course.id == Assignment.course_id)  # type: ignore
@@ -695,7 +627,6 @@ async def read_assignment_from_activity_uuid(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     statement = (
         select(Assignment, Course.course_uuid, Activity.activity_uuid)
         .join(Activity, Activity.id == Assignment.activity_id)  # type: ignore
@@ -727,7 +658,6 @@ async def update_assignment(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -772,7 +702,6 @@ async def delete_assignment(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -812,7 +741,6 @@ async def delete_assignment_from_activity_uuid(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if activity exists
     statement = select(Activity).where(Activity.activity_uuid == activity_uuid)
 
@@ -868,7 +796,6 @@ async def create_assignment_task(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -919,7 +846,6 @@ async def read_assignment_tasks(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Find assignment
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -963,7 +889,6 @@ async def read_assignment_task(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Find assignment
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1010,7 +935,6 @@ async def put_assignment_task_reference_file(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     reference_file: UploadFile | None = None,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1085,7 +1009,6 @@ async def put_assignment_task_submission_file(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     sub_file: UploadFile | None = None,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1157,7 +1080,6 @@ async def update_assignment_task(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1214,7 +1136,6 @@ async def delete_assignment_task(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1267,7 +1188,6 @@ async def handle_assignment_task_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     assignment_task_submission_uuid = assignment_task_submission_object.assignment_task_submission_uuid
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
@@ -1399,7 +1319,6 @@ async def read_user_assignment_task_submissions(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1471,7 +1390,6 @@ async def read_user_assignment_task_submissions_me_batch(
     """Return a map of {assignment_task_uuid: submission | None} for the
     current user across every task in the assignment, in a single round trip.
     Replaces N per-task /submissions/me calls from the activity view."""
-    _block_api_tokens(current_user)
 
     assignment_row = db_session.exec(
         select(Assignment, Course.course_uuid)
@@ -1519,7 +1437,6 @@ async def read_user_assignment_task_submissions_me(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid
@@ -1578,7 +1495,6 @@ async def read_assignment_task_submissions(
     limit: int = 50,
     offset: int = 0,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task exists
     statement = select(AssignmentTask).where(
         AssignmentTask.assignment_task_uuid == assignment_task_uuid,
@@ -1628,7 +1544,6 @@ async def update_assignment_task_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task submission exists
     statement = select(AssignmentTaskSubmission).where(
         AssignmentTaskSubmission.assignment_task_submission_uuid
@@ -1698,7 +1613,6 @@ async def delete_assignment_task_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment task submission exists
     statement = select(AssignmentTaskSubmission).where(
         AssignmentTaskSubmission.assignment_task_submission_uuid
@@ -1763,7 +1677,6 @@ async def create_assignment_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2006,7 +1919,6 @@ async def read_assignment_submissions(
     limit: int = 50,
     offset: int = 0,
 ):
-    _block_api_tokens(current_user)
     # Find assignment
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2079,7 +1991,6 @@ async def read_user_assignment_submissions(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Find assignment
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2132,7 +2043,6 @@ async def read_user_assignment_submissions_me(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     return await read_user_assignment_submissions(
         request,
         assignment_uuid,
@@ -2150,7 +2060,6 @@ async def update_assignment_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2223,7 +2132,6 @@ async def delete_assignment_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2587,7 +2495,6 @@ async def grade_assignment_submission(
     db_session: Session,
     overall_feedback: str | None = None,
 ):
-    _block_api_tokens(current_user)
     # SECURITY: This function should only be accessible by course owners or instructors
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
@@ -2647,7 +2554,6 @@ async def get_grade_assignment_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = db_session.exec(statement).first()
@@ -2739,7 +2645,6 @@ async def mark_activity_as_done_for_user(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # SECURITY: This function should only be accessible by course owners or instructors
     # Get Assignment
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
@@ -2821,7 +2726,6 @@ async def get_assignments_from_course(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: Session,
 ):
-    _block_api_tokens(current_user)
     # Find course
     statement = select(Course).where(Course.course_uuid == course_uuid)
     course = db_session.exec(statement).first()
