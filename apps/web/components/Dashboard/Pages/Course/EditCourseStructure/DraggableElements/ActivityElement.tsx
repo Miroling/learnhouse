@@ -22,6 +22,7 @@ import {
   MoreVertical,
   Package,
   Pencil,
+  Puzzle,
   Save,
   Sparkles,
   Trash2,
@@ -437,8 +438,14 @@ const ACTIVITIES = {
   'TYPE_SCORM': {
     displayNameKey: 'scorm',
     Icon: Package
+  },
+  'TYPE_CUSTOM': {
+    displayNameKey: 'custom',
+    Icon: Puzzle
   }
 }
+
+const UNKNOWN_ACTIVITY = { displayNameKey: 'dynamic', Icon: Sparkles }
 
 const ActivityTypeIndicator = ({activityType, activitySubType, isMobile} : { activityType: keyof typeof ACTIVITIES, activitySubType?: string, isMobile: boolean}) => {
   const { t } = useTranslation()
@@ -448,7 +455,7 @@ const ActivityTypeIndicator = ({activityType, activitySubType, isMobile} : { act
     ? { displayNameKey: 'markdown', Icon: MarkdownLogo }
     : isEmbed
     ? { displayNameKey: 'embed', Icon: GlobePhosphor }
-    : ACTIVITIES[activityType]
+    : ACTIVITIES[activityType] ?? UNKNOWN_ACTIVITY
 
   return (
     <div className="flex items-center gap-1.5 flex-shrink-0">
