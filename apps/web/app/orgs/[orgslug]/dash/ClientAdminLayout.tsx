@@ -8,6 +8,7 @@ import AdminAuthorization from '@components/Security/AdminAuthorization'
 import { SessionGate } from '@components/Contexts/LHSessionContext'
 import { CommandPaletteProvider } from '@components/Dashboard/CommandPalette/CommandPaletteContext'
 import CommandPalette from '@components/Dashboard/CommandPalette/CommandPalette'
+import { AtlasMiniProvider } from '@components/Dashboard/Atlas/AtlasMiniContext'
 import React from 'react'
 import { useMediaQuery } from 'usehooks-ts';
 
@@ -24,20 +25,22 @@ function ClientAdminLayout({
         <SessionGate>
             <AdminAuthorization authorizationMode="page">
                 <CommandPaletteProvider>
-                    <div className="flex flex-col md:flex-row">
-                        {isMobile ? (
-                            <DashMobileMenu />
-                        ) : (
-                            <DashLeftMenu />
-                        )}
-                        <div className="flex flex-col w-full relative isolate">
-                            <FreePlanUpgradeBanner />
-                            {children}
-                            <OnboardingBar />
+                    <AtlasMiniProvider>
+                        <div className="flex flex-col md:flex-row">
+                            {isMobile ? (
+                                <DashMobileMenu />
+                            ) : (
+                                <DashLeftMenu />
+                            )}
+                            <div className="flex flex-col w-full relative isolate">
+                                <FreePlanUpgradeBanner />
+                                {children}
+                                <OnboardingBar />
+                            </div>
+                            <WelcomeModal />
+                            <CommandPalette />
                         </div>
-                        <WelcomeModal />
-                        <CommandPalette />
-                    </div>
+                    </AtlasMiniProvider>
                 </CommandPaletteProvider>
             </AdminAuthorization>
         </SessionGate>

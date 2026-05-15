@@ -42,7 +42,7 @@ async def event_generator(generator, session_uuid: str):
 
 
 def get_org_ai_model(org_id: int, db_session: Session) -> str:
-    return "gemini-3-pro-preview"
+    return "gemini-3.1-pro-preview"
 
 
 @router.post(

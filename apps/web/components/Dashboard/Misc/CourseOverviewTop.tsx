@@ -10,6 +10,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import EmptyThumbnailImage from '../../../public/empty_thumbnail.png'
 import { BookCopy, BrainCircuit, Eye, Globe, GlobeLock, Loader2, Check, Info } from 'lucide-react'
+import { GlobeStand } from '@phosphor-icons/react'
+import { useAtlasMini, useRegisterAtlasPageContext } from '@components/Dashboard/Atlas/AtlasMiniContext'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@components/ui/tooltip'
 import { useTranslation } from 'react-i18next'
 import { updateCourse } from '@services/courses/courses'
@@ -33,10 +35,23 @@ export function CourseOverviewTop({
   const [isPublishing, setIsPublishing] = useState(false)
   const [isIndexing, setIsIndexing] = useState(false)
   const [isIndexed, setIsIndexed] = useState(false)
+  const { open: atlasOpen, toggle: toggleAtlas } = useAtlasMini()
 
   const courseStructure = course?.courseStructure
   const isPublished = courseStructure?.published
   const withUnpublishedActivities = course?.withUnpublishedActivities ?? false
+
+  // Tell Atlas which course the user is viewing so the agent can pre-focus
+  // it and skip the "which course?" round-trip on terse messages like
+  // "fill this please". Cleared automatically on unmount.
+  useRegisterAtlasPageContext(
+    courseStructure?.course_uuid
+      ? {
+          course_uuid: courseStructure.course_uuid,
+          course_name: courseStructure.name,
+        }
+      : null,
+  )
 
   // Use unified cache key
   const cacheKey = courseStructure?.course_uuid
@@ -189,20 +204,22 @@ export function CourseOverviewTop({
           <button
             onClick={togglePublishStatus}
             disabled={isPublishing}
-            className={`group px-3.5 py-2 text-sm font-semibold flex items-center space-x-2 transition-colors ${
+            aria-label={isPublished ? 'Unpublish course' : 'Publish course'}
+            title={isPublished ? 'Click to unpublish' : 'Click to publish'}
+            className={`group px-3.5 py-2 text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${
               isPublished
                 ? 'bg-green-50/70 text-green-700 hover:bg-green-100/70'
                 : 'bg-yellow-50/70 text-yellow-700 hover:bg-yellow-100/70'
             } ${isPublishing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {isPublishing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin flex-none" />
             ) : isPublished ? (
-              <Globe className="w-4 h-4" />
+              <Globe className="w-4 h-4 flex-none" />
             ) : (
-              <GlobeLock className="w-4 h-4" />
+              <GlobeLock className="w-4 h-4 flex-none" />
             )}
-            <span>
+            <span className="hidden md:inline">
               {isPublishing
                 ? t('dashboard.courses.processing')
                 : isPublished
@@ -211,7 +228,7 @@ export function CourseOverviewTop({
               }
             </span>
             {!isPublishing && (
-              <span className={`inline-flex overflow-hidden max-w-0 group-hover:max-w-[150px] opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out`}>
+              <span className="hidden lg:inline-flex overflow-hidden max-w-0 group-hover:max-w-[150px] opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out">
                 <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded whitespace-nowrap ${
                   isPublished
                     ? 'bg-green-200/80 text-green-800'
@@ -231,20 +248,21 @@ export function CourseOverviewTop({
                     <button
                       onClick={indexCourseForAI}
                       disabled={isIndexing}
-                      className={`group px-3.5 py-2 text-sm font-semibold flex items-center space-x-2 transition-colors ${
+                      aria-label={isIndexing ? 'Indexing course' : isIndexed ? 'Course indexed' : 'Index course for AI'}
+                      className={`group px-3.5 py-2 text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${
                         isIndexed
                           ? 'bg-blue-50/70 text-blue-700'
                           : 'bg-purple-50/70 text-purple-700 hover:bg-purple-100/70'
                       } ${isIndexing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       {isIndexing ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin flex-none" />
                       ) : isIndexed ? (
-                        <Check className="w-4 h-4" />
+                        <Check className="w-4 h-4 flex-none" />
                       ) : (
-                        <BrainCircuit className="w-4 h-4" />
+                        <BrainCircuit className="w-4 h-4 flex-none" />
                       )}
-                      <span>
+                      <span className="hidden lg:inline">
                         {isIndexing ? 'Indexing...' : isIndexed ? 'Indexed' : 'Index for AI'}
                       </span>
                     </button>
@@ -260,11 +278,33 @@ export function CourseOverviewTop({
           <Link
             href={getUriWithOrg(org?.slug, '') + `/course/${params.courseuuid}`}
             target="_blank"
-            className="px-3.5 py-2 text-sm font-semibold text-neutral-600 bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors flex items-center space-x-2"
+            aria-label={t('dashboard.courses.preview')}
+            title={t('dashboard.courses.preview')}
+            className="px-3.5 py-2 text-sm font-semibold text-neutral-600 bg-neutral-50/70 hover:bg-neutral-100/70 transition-colors flex items-center space-x-2 whitespace-nowrap"
           >
-            <Eye className="w-4 h-4" />
-            <span>{t('dashboard.courses.preview')}</span>
+            <Eye className="w-4 h-4 flex-none" />
+            <span className="hidden md:inline">{t('dashboard.courses.preview')}</span>
           </Link>
+          {isAIEnabled && (
+            <>
+              <div className="w-px self-stretch bg-neutral-200/80" />
+              <button
+                type="button"
+                onClick={toggleAtlas}
+                aria-pressed={atlasOpen}
+                aria-label="Toggle Atlas quick assist"
+                title="Atlas"
+                className={`px-3.5 py-2 text-sm font-semibold flex items-center space-x-2 whitespace-nowrap transition-colors ${
+                  atlasOpen
+                    ? 'bg-violet-100 text-violet-700'
+                    : 'bg-violet-50/70 text-violet-700 hover:bg-violet-100/70'
+                }`}
+              >
+                <GlobeStand size={16} weight="duotone" className="flex-none" />
+                <span className="hidden md:inline">Atlas</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>
