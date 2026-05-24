@@ -7,8 +7,8 @@ authors = [
     {name = "Badr B. (swve)"}
 ]
 dependencies = [
-    "boto3==1.43.11",
-    "botocore==1.43.11",
+    "boto3==1.43.12",
+    "botocore==1.43.12",
     "faker==40.18.0",
     "fastapi==0.136.1",
     "httpx==0.28.1",
@@ -45,7 +45,7 @@ dependencies = [
     "defusedxml==0.7.1",
     "llama-index-core==0.14.22",
     "pgvector==0.4.2",
-    "pypdf==6.11.0",
+    "pypdf==6.12.0",
 ]
 
 [tool.ruff]
